@@ -1,0 +1,647 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VitalScan — Health Check</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050d1a;
+    --surface: #0b1929;
+    --card: #0f2035;
+    --border: rgba(0,210,180,0.12);
+    --accent: #00d2b4;
+    --accent2: #0af;
+    --warn: #f97316;
+    --danger: #ef4444;
+    --good: #22c55e;
+    --text: #e8f4f2;
+    --muted: #7da8a0;
+    --pulse: rgba(0,210,180,0.4);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,210,180,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,210,180,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  body::after {
+    content:'';
+    position:fixed;
+    top:-30%; left:-20%;
+    width:70vw; height:70vw;
+    border-radius:50%;
+    background: radial-gradient(ellipse, rgba(0,210,180,0.06) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+
+  .wrapper { position:relative; z-index:1; max-width:1000px; margin:0 auto; padding:24px 20px 60px; }
+
+  /* ── HEADER ── */
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom:36px;
+  }
+  .logo {
+    display:flex; align-items:center; gap:12px;
+  }
+  .logo-icon {
+    width:40px; height:40px;
+    background: linear-gradient(135deg, #00d2b4, #00aaff);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+    box-shadow: 0 0 20px rgba(0,210,180,0.35);
+  }
+  .logo h1 {
+    font-family:'DM Serif Display', serif;
+    font-size:1.5rem;
+    letter-spacing:0.02em;
+    color:#fff;
+  }
+  .logo span { color: var(--accent); }
+  .status-pill {
+    display:flex; align-items:center; gap:8px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius:999px;
+    padding:6px 14px;
+    font-size:0.78rem; font-weight:500;
+    color: var(--good);
+  }
+  .dot {
+    width:8px; height:8px; border-radius:50%;
+    background: var(--good);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── HERO SECTION ── */
+  .hero {
+    text-align:center;
+    margin-bottom:48px;
+    animation: fadeUp 0.7s ease both;
+  }
+  .hero h2 {
+    font-family:'DM Serif Display', serif;
+    font-size:clamp(2rem,5vw,3.2rem);
+    line-height:1.15;
+    margin-bottom:14px;
+    color:#fff;
+  }
+  .hero h2 em { font-style:italic; color:var(--accent); }
+  .hero p { color:var(--muted); font-size:1.05rem; font-weight:300; max-width:500px; margin:0 auto 28px; }
+  .cta-btn {
+    display:inline-flex; align-items:center; gap:10px;
+    background: linear-gradient(135deg, #00d2b4, #00aaff);
+    color:#000; font-weight:600; font-size:0.95rem;
+    border:none; border-radius:12px;
+    padding:14px 28px; cursor:pointer;
+    box-shadow: 0 4px 24px rgba(0,210,180,0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .cta-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,210,180,0.45); }
+  .cta-btn svg { width:18px; height:18px; }
+
+  /* ── ECG LINE ── */
+  .ecg-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius:16px;
+    padding:20px 24px 14px;
+    margin-bottom:40px;
+    overflow:hidden;
+    position:relative;
+  }
+  .ecg-label {
+    font-family:'DM Mono', monospace;
+    font-size:0.72rem; color:var(--muted);
+    letter-spacing:0.1em; text-transform:uppercase;
+    margin-bottom:12px;
+  }
+  .ecg-label span { color:var(--accent); margin-left:8px; }
+  svg.ecg {
+    width:100%; height:60px;
+    overflow:visible;
+  }
+  .ecg-path {
+    fill:none;
+    stroke:var(--accent);
+    stroke-width:2;
+    stroke-linecap:round;
+    filter: drop-shadow(0 0 4px var(--accent));
+    stroke-dasharray: 900;
+    stroke-dashoffset: 900;
+    animation: drawECG 2.5s ease forwards, ecgLoop 3s 2.5s linear infinite;
+  }
+  @keyframes drawECG {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes ecgLoop {
+    0%   { stroke-dashoffset:0; }
+    100% { stroke-dashoffset:-900; }
+  }
+
+  /* ── METRICS GRID ── */
+  .metrics-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
+    gap:16px;
+    margin-bottom:40px;
+  }
+
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius:16px;
+    padding:22px 20px;
+    position:relative;
+    overflow:hidden;
+    cursor:pointer;
+    transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+    animation: fadeUp 0.6s ease both;
+  }
+  .metric-card:nth-child(1){animation-delay:0.05s}
+  .metric-card:nth-child(2){animation-delay:0.1s}
+  .metric-card:nth-child(3){animation-delay:0.15s}
+  .metric-card:nth-child(4){animation-delay:0.2s}
+  .metric-card:nth-child(5){animation-delay:0.25s}
+  .metric-card:nth-child(6){animation-delay:0.3s}
+
+  .metric-card:hover { transform:translateY(-4px); border-color:rgba(0,210,180,0.3); box-shadow:0 8px 32px rgba(0,210,180,0.1); }
+  .metric-card::before {
+    content:'';
+    position:absolute; top:0; left:0; right:0; height:3px;
+    border-radius:16px 16px 0 0;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity:0;
+    transition:opacity 0.3s;
+  }
+  .metric-card:hover::before { opacity:1; }
+
+  .metric-icon { font-size:1.6rem; margin-bottom:12px; line-height:1; }
+  .metric-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); font-family:'DM Mono',monospace; margin-bottom:6px; }
+  .metric-value {
+    font-size:1.9rem; font-weight:600; line-height:1;
+    color:#fff; margin-bottom:4px;
+    font-family:'DM Serif Display', serif;
+  }
+  .metric-unit { font-size:0.85rem; color:var(--muted); font-weight:300; }
+  .metric-status {
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:0.7rem; font-weight:500;
+    margin-top:10px;
+    padding:3px 8px; border-radius:6px;
+  }
+  .metric-status.good { background:rgba(34,197,94,0.12); color:var(--good); }
+  .metric-status.warn { background:rgba(249,115,22,0.12); color:var(--warn); }
+  .metric-status.danger { background:rgba(239,68,68,0.12); color:var(--danger); }
+
+  /* sparkline inside card */
+  .spark { width:100%; height:28px; margin-top:10px; }
+  .spark-path { fill:none; stroke-width:1.5; stroke-linecap:round; }
+  .spark-path.good-line  { stroke: var(--good); }
+  .spark-path.warn-line  { stroke: var(--warn); }
+  .spark-path.accent-line{ stroke: var(--accent); }
+
+  /* ── CHECKLIST ── */
+  .section-title {
+    font-family:'DM Serif Display', serif;
+    font-size:1.4rem; color:#fff;
+    margin-bottom:18px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section-title::after {
+    content:'';
+    flex:1; height:1px;
+    background:linear-gradient(90deg, var(--border), transparent);
+  }
+
+  .checklist {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+    margin-bottom:40px;
+  }
+  @media(max-width:600px){
+    .checklist { grid-template-columns:1fr; }
+  }
+
+  .check-item {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px 18px;
+    display:flex; align-items:center; gap:14px;
+    cursor:pointer;
+    transition: background 0.2s, border-color 0.2s;
+    animation: fadeUp 0.6s ease both;
+  }
+  .check-item:nth-child(odd){animation-delay:0.1s}
+  .check-item:nth-child(even){animation-delay:0.15s}
+  .check-item:hover { background: rgba(0,210,180,0.05); border-color:rgba(0,210,180,0.25); }
+  .check-item.done { background: rgba(34,197,94,0.05); border-color:rgba(34,197,94,0.2); }
+  .check-item.done .check-box { background:var(--good); border-color:var(--good); }
+  .check-item.done .check-box::after { opacity:1; }
+
+  .check-box {
+    width:22px; height:22px; border-radius:6px; flex-shrink:0;
+    border:2px solid var(--muted);
+    position:relative; transition:all 0.2s;
+  }
+  .check-box::after {
+    content:'✓';
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.75rem; color:#000; font-weight:700;
+    opacity:0; transition:opacity 0.2s;
+  }
+  .check-text { font-size:0.88rem; font-weight:400; line-height:1.4; }
+  .check-text strong { display:block; font-weight:600; margin-bottom:2px; }
+  .check-text span { color:var(--muted); font-size:0.8rem; }
+
+  /* ── BMI CALCULATOR ── */
+  .bmi-card {
+    background: var(--card);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:28px 28px 32px;
+    margin-bottom:40px;
+    animation: fadeUp 0.7s 0.1s ease both;
+  }
+  .bmi-inputs {
+    display:flex; gap:16px; flex-wrap:wrap;
+    margin:20px 0 22px;
+  }
+  .input-group { flex:1; min-width:140px; }
+  .input-group label {
+    display:block;
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em;
+    color:var(--muted); font-family:'DM Mono',monospace;
+    margin-bottom:8px;
+  }
+  .input-group input {
+    width:100%; padding:12px 14px;
+    background:rgba(0,210,180,0.05);
+    border:1px solid var(--border);
+    border-radius:10px; color:#fff;
+    font-size:1rem; font-family:'Outfit',sans-serif;
+    outline:none; transition: border-color 0.2s;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+  .calc-btn {
+    background:linear-gradient(135deg,#00d2b4,#00aaff);
+    color:#000; font-weight:600; font-size:0.9rem;
+    border:none; border-radius:10px; padding:13px 28px;
+    cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;
+    margin-top:22px; align-self:flex-end;
+  }
+  .calc-btn:hover { transform:translateY(-2px); box-shadow:0 4px 20px rgba(0,210,180,0.35); }
+
+  .bmi-result {
+    display:none;
+    margin-top:24px;
+    padding:20px 22px;
+    border-radius:14px;
+    border:1px solid var(--border);
+    background:rgba(0,210,180,0.04);
+    animation:fadeUp 0.4s ease both;
+  }
+  .bmi-result.show { display:block; }
+  .bmi-number {
+    font-family:'DM Serif Display', serif;
+    font-size:3rem; line-height:1;
+    margin-bottom:6px;
+  }
+  .bmi-category { font-size:0.9rem; color:var(--muted); margin-bottom:14px; }
+  .bmi-bar-wrap { background:rgba(255,255,255,0.08); border-radius:999px; height:8px; overflow:hidden; }
+  .bmi-bar { height:100%; border-radius:999px; transition:width 0.8s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ── TIPS SECTION ── */
+  .tips-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+    gap:14px;
+    margin-bottom:20px;
+  }
+  .tip-card {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px 18px;
+    animation: fadeUp 0.6s ease both;
+  }
+  .tip-card:nth-child(1){animation-delay:0.05s}
+  .tip-card:nth-child(2){animation-delay:0.1s}
+  .tip-card:nth-child(3){animation-delay:0.15s}
+  .tip-card:nth-child(4){animation-delay:0.2s}
+  .tip-emoji { font-size:1.6rem; margin-bottom:10px; }
+  .tip-card h4 { font-size:0.9rem; font-weight:600; margin-bottom:6px; }
+  .tip-card p { font-size:0.8rem; color:var(--muted); line-height:1.55; }
+
+  /* ── FOOTER ── */
+  footer {
+    margin-top:52px;
+    border-top:1px solid var(--border);
+    padding-top:24px;
+    text-align:center;
+    color:var(--muted);
+    font-size:0.78rem;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(20px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* ── PULSE RING (decorative) ── */
+  .pulse-ring {
+    position:fixed;
+    top:60px; right:60px;
+    width:80px; height:80px;
+    border-radius:50%;
+    border:1px solid var(--accent);
+    opacity:0.15;
+    animation:ringPulse 3s ease-out infinite;
+    pointer-events:none; z-index:0;
+  }
+  .pulse-ring:nth-child(2){ animation-delay:1s; width:120px; height:120px; top:40px; right:40px; }
+  .pulse-ring:nth-child(3){ animation-delay:2s; width:160px; height:160px; top:20px; right:20px; }
+  @keyframes ringPulse {
+    0%  { transform:scale(0.8); opacity:0.2; }
+    100%{ transform:scale(1.4); opacity:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Decorative pulse rings -->
+<div class="pulse-ring"></div>
+<div class="pulse-ring"></div>
+<div class="pulse-ring"></div>
+
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">💗</div>
+      <h1>Vital<span>Scan</span></h1>
+    </div>
+    <div class="status-pill">
+      <div class="dot"></div>
+      Monitoring Active
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <div class="hero">
+    <h2>Your <em>complete</em> health<br>check, simplified.</h2>
+    <p>Track vital signs, assess lifestyle habits, and calculate key health metrics — all in one place.</p>
+    <button class="cta-btn" onclick="document.getElementById('checklist').scrollIntoView({behavior:'smooth'})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Start Health Check
+    </button>
+  </div>
+
+  <!-- ECG LINE -->
+  <div class="ecg-wrap">
+    <div class="ecg-label">Live ECG Simulation <span>● Recording</span></div>
+    <svg class="ecg" viewBox="0 0 900 60" preserveAspectRatio="none">
+      <path class="ecg-path" d="
+        M0,30 L60,30 L80,30 L90,5 L100,55 L110,15 L120,30
+        L180,30 L200,30 L210,5 L220,55 L230,15 L240,30
+        L300,30 L320,30 L330,5 L340,55 L350,15 L360,30
+        L420,30 L440,30 L450,5 L460,55 L470,15 L480,30
+        L540,30 L560,30 L570,5 L580,55 L590,15 L600,30
+        L660,30 L680,30 L690,5 L700,55 L710,15 L720,30
+        L780,30 L800,30 L810,5 L820,55 L830,15 L840,30
+        L900,30
+      "/>
+    </svg>
+  </div>
+
+  <!-- METRICS GRID -->
+  <p class="section-title">Vital Metrics</p>
+  <div class="metrics-grid">
+
+    <div class="metric-card">
+      <div class="metric-icon">❤️</div>
+      <div class="metric-label">Heart Rate</div>
+      <div class="metric-value">72 <span class="metric-unit">bpm</span></div>
+      <div class="metric-status good">● Normal</div>
+      <svg class="spark" viewBox="0 0 100 28">
+        <polyline class="spark-path good-line" points="0,20 10,18 20,14 30,16 40,10 50,12 60,8 70,14 80,10 90,12 100,8"/>
+      </svg>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon">🩸</div>
+      <div class="metric-label">Blood Pressure</div>
+      <div class="metric-value">118<span style="font-size:1rem;color:var(--muted)">/76</span> <span class="metric-unit">mmHg</span></div>
+      <div class="metric-status good">● Optimal</div>
+      <svg class="spark" viewBox="0 0 100 28">
+        <polyline class="spark-path good-line" points="0,14 10,12 20,16 30,12 40,14 50,10 60,13 70,11 80,14 90,12 100,13"/>
+      </svg>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon">🌡️</div>
+      <div class="metric-label">Body Temp</div>
+      <div class="metric-value">98.6 <span class="metric-unit">°F</span></div>
+      <div class="metric-status good">● Normal</div>
+      <svg class="spark" viewBox="0 0 100 28">
+        <polyline class="spark-path accent-line" points="0,14 10,13 20,14 30,14 40,13 50,14 60,14 70,13 80,14 90,14 100,14"/>
+      </svg>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon">🫁</div>
+      <div class="metric-label">SpO₂</div>
+      <div class="metric-value">98 <span class="metric-unit">%</span></div>
+      <div class="metric-status good">● Excellent</div>
+      <svg class="spark" viewBox="0 0 100 28">
+        <polyline class="spark-path good-line" points="0,8 10,9 20,8 30,10 40,8 50,9 60,8 70,9 80,8 90,9 100,8"/>
+      </svg>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon">💤</div>
+      <div class="metric-label">Sleep (last night)</div>
+      <div class="metric-value">6.5 <span class="metric-unit">hrs</span></div>
+      <div class="metric-status warn">● Below target</div>
+      <svg class="spark" viewBox="0 0 100 28">
+        <polyline class="spark-path warn-line" points="0,10 10,12 20,8 30,14 40,10 50,16 60,12 70,18 80,14 90,18 100,20"/>
+      </svg>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon">🥤</div>
+      <div class="metric-label">Hydration</div>
+      <div class="metric-value">1.2 <span class="metric-unit">L / 2.5L</span></div>
+      <div class="metric-status warn">● Low</div>
+      <svg class="spark" viewBox="0 0 100 28">
+        <polyline class="spark-path warn-line" points="0,22 10,20 20,18 30,20 40,16 50,18 60,20 70,16 80,18 90,20 100,16"/>
+      </svg>
+    </div>
+
+  </div>
+
+  <!-- HEALTH CHECKLIST -->
+  <p class="section-title" id="checklist">Symptom Checklist</p>
+  <div class="checklist">
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>No chest pain or discomfort</strong><span>Includes tightness, pressure, squeezing</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>No shortness of breath</strong><span>At rest or during light activity</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>No unusual fatigue</strong><span>Persistent tiredness without cause</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>Normal appetite &amp; digestion</strong><span>No nausea, vomiting, or changes</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>No dizziness or headaches</strong><span>Frequent or severe episodes</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>Good vision &amp; balance</strong><span>No blurring, spots, or stumbling</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>No joint or muscle pain</strong><span>Swelling, stiffness, or soreness</span></div>
+    </div>
+    <div class="check-item" onclick="this.classList.toggle('done')">
+      <div class="check-box"></div>
+      <div class="check-text"><strong>Positive mental state</strong><span>No prolonged anxiety or low mood</span></div>
+    </div>
+  </div>
+
+  <!-- BMI CALCULATOR -->
+  <p class="section-title">BMI Calculator</p>
+  <div class="bmi-card">
+    <p style="color:var(--muted);font-size:0.88rem;">Enter your measurements to calculate your Body Mass Index and get a health assessment.</p>
+    <div class="bmi-inputs">
+      <div class="input-group">
+        <label>Weight (kg)</label>
+        <input type="number" id="weight" placeholder="e.g. 70" min="20" max="250">
+      </div>
+      <div class="input-group">
+        <label>Height (cm)</label>
+        <input type="number" id="height" placeholder="e.g. 175" min="100" max="250">
+      </div>
+      <div class="input-group">
+        <label>Age</label>
+        <input type="number" id="age" placeholder="e.g. 30" min="1" max="120">
+      </div>
+    </div>
+    <button class="calc-btn" onclick="calcBMI()">Calculate BMI</button>
+
+    <div class="bmi-result" id="bmiResult">
+      <div class="bmi-number" id="bmiNum"></div>
+      <div class="bmi-category" id="bmiCat"></div>
+      <div class="bmi-bar-wrap"><div class="bmi-bar" id="bmiBar"></div></div>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:10px;">BMI is a screening tool, not a definitive health diagnostic. Consult a healthcare professional for advice.</p>
+    </div>
+  </div>
+
+  <!-- HEALTH TIPS -->
+  <p class="section-title">Daily Health Tips</p>
+  <div class="tips-grid">
+    <div class="tip-card">
+      <div class="tip-emoji">🚶</div>
+      <h4>Move Every Hour</h4>
+      <p>A 5-minute walk every hour reduces cardiovascular risk and improves circulation significantly.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-emoji">💧</div>
+      <h4>Hydrate Proactively</h4>
+      <p>Drink a glass of water before each meal. Mild dehydration impairs cognitive function by 20%.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-emoji">😴</div>
+      <h4>Sleep Consistency</h4>
+      <p>Wake up at the same time every day — even weekends. This regulates your circadian rhythm.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-emoji">🧘</div>
+      <h4>Breathe Deeply</h4>
+      <p>Box breathing (4-4-4-4) activates the parasympathetic system, reducing cortisol in minutes.</p>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>VitalScan is a wellness tracking tool, not a medical device. Always consult a qualified healthcare provider for medical advice.</p>
+    <p style="margin-top:6px;">© 2026 VitalScan Health — All rights reserved.</p>
+  </footer>
+
+</div>
+
+<script>
+  function calcBMI() {
+    const w = parseFloat(document.getElementById('weight').value);
+    const h = parseFloat(document.getElementById('height').value) / 100;
+    if (!w || !h || h <= 0) { alert('Please enter valid weight and height.'); return; }
+
+    const bmi = (w / (h * h)).toFixed(1);
+    let cat, color, barW;
+
+    if (bmi < 18.5)      { cat='Underweight';    color='#60a5fa'; barW='18%'; }
+    else if (bmi < 25)   { cat='Normal weight';  color='#22c55e'; barW='45%'; }
+    else if (bmi < 30)   { cat='Overweight';     color='#f97316'; barW='68%'; }
+    else                 { cat='Obese';           color='#ef4444'; barW='90%'; }
+
+    document.getElementById('bmiNum').textContent = bmi;
+    document.getElementById('bmiNum').style.color = color;
+    document.getElementById('bmiCat').textContent = Category: ${cat};
+    const bar = document.getElementById('bmiBar');
+    bar.style.background = color;
+    bar.style.width = '0%';
+    setTimeout(() => bar.style.width = barW, 50);
+
+    const res = document.getElementById('bmiResult');
+    res.classList.remove('show');
+    void res.offsetWidth;
+    res.classList.add('show');
+  }
+
+  // allow Enter key on inputs
+  ['weight','height','age'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => {
+      if(e.key==='Enter') calcBMI();
+    })
+  );
+</script>
+
+</body>
+</html>
